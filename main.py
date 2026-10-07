@@ -1,46 +1,44 @@
-from src.create_connexion import get_connection
+import sys
+
+from exercice.reset_velos import run_reset_velos
+from exercice.t1_location import run_t1_location
+from exercice.t2_station_inexistante import run_t2_station_inexistante
+from exercice.t3_retour import run_t3_retour
+from exercice.t4_location_python import run_t4_location
+from exercice.t5_concurrence import run_t5_concurrence
+
+EXERCICE_LIST = [
+    ("T1 - L'abonné 42 loue le vélo 1 (station 5)", run_t1_location),
+    ("T2 - Vélo 2 depuis la station 9999", run_t2_station_inexistante),
+    ("T3 - Retour du vélo 1 à la station 12", run_t3_retour),
+    ("T4 - Location en Python avec connection.transaction()", run_t4_location),
+]
 
 
-def run_start_trajet(abonne_id, velo_id):
+def run_exercice_list():
+    print("\n=== Remise à zéro des vélos 1, 2 et 8 ===")
+    run_reset_velos()
 
-    with get_connection() as connection:
-        connection.autocommit = True  # indispensable !
+    for titre, run_exercice in EXERCICE_LIST:
+        input(f"\nEntrée pour lancer : {titre}")
+        print(f"\n=== {titre} ===")
+        run_exercice()
 
-        with connection.transaction():  # BEGIN
-            with connection.cursor() as cursor:
-                # On récupère la station du vélo AVANT de la mettre à NULL
-                # (FOR UPDATE verrouille la ligne pendant la transaction)
-                cursor.execute(
-                    "SELECT station_id, etat FROM velo "
-                    "WHERE id = %s FOR UPDATE;",
-                    (velo_id,),
-                )
-                row = cursor.fetchone()
-                if row is None:
-                    raise ValueError(f"Vélo {velo_id} introuvable")
-                station_depart_id, etat = row
-                # Un vélo déjà en trajet n'a plus de station : on refuse
-                if etat != "disponible":
-                    raise ValueError(
-                        f"Vélo {velo_id} non disponible (état : {etat})"
-                    )
-
-                cursor.execute(
-                    "UPDATE velo SET etat = 'en_trajet', "
-                    "station_id = NULL WHERE id = %s;",
-                    (velo_id,),
-                )
-                cursor.execute(
-                    "INSERT INTO trajet (abonne_id, velo_id, "
-                    "station_depart_id, depart_le) "
-                    "VALUES (%s, %s, %s, NOW());",
-                    (abonne_id, velo_id, station_depart_id),
-                )
+    print("\nT1 à T4 terminés. Pour T5, ouvre deux terminaux et lance dans chacun :")
+    print("  uv run python main.py t5")
+    print("(lance d'abord `uv run python main.py reset` pour libérer le vélo 8)")
 
 
 def main():
+    commande = sys.argv[1] if len(sys.argv) > 1 else "all"
 
-    run_start_trajet(abonne_id=1, velo_id=1)
+    if commande == "t5":
+        print("\n=== T5 - Deux terminaux, un seul vélo 8 ===")
+        run_t5_concurrence()
+    elif commande == "reset":
+        run_reset_velos()
+    else:
+        run_exercice_list()
 
 
 if __name__ == "__main__":

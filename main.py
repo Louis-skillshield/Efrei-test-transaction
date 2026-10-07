@@ -11,13 +11,19 @@ def run_start_trajet(abonne_id, velo_id):
                 # On récupère la station du vélo AVANT de la mettre à NULL
                 # (FOR UPDATE verrouille la ligne pendant la transaction)
                 cursor.execute(
-                    "SELECT station_id FROM velo WHERE id = %s FOR UPDATE;",
+                    "SELECT station_id, etat FROM velo "
+                    "WHERE id = %s FOR UPDATE;",
                     (velo_id,),
                 )
                 row = cursor.fetchone()
                 if row is None:
                     raise ValueError(f"Vélo {velo_id} introuvable")
-                station_depart_id = row[0]
+                station_depart_id, etat = row
+                # Un vélo déjà en trajet n'a plus de station : on refuse
+                if etat != "disponible":
+                    raise ValueError(
+                        f"Vélo {velo_id} non disponible (état : {etat})"
+                    )
 
                 cursor.execute(
                     "UPDATE velo SET etat = 'en_trajet', "
@@ -30,7 +36,6 @@ def run_start_trajet(abonne_id, velo_id):
                     "VALUES (%s, %s, %s, NOW());",
                     (abonne_id, velo_id, station_depart_id),
                 )
-        # COMMIT automatique ici, ROLLBACK si une exception est levée
 
 
 def main():

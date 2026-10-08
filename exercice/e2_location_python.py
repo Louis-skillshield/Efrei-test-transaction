@@ -21,14 +21,30 @@ def run_e2_location(abonne_id=42, velo_id=8):
             print_velo(cursor, velo_id, "avant")
 
         try:
-            # TODO 1 : ouvrir un bloc `with connection.transaction():`
-            #          puis un curseur `with connection.cursor() as cursor:`
-            # TODO 2 : SELECT station_id, etat du vélo
-            #          (on lit la station AVANT de la mettre à NULL)
-            # TODO 3 : si etat != 'disponible' -> raise ValueError("...")
-            # TODO 4 : UPDATE du vélo + INSERT du trajet
-            #          (station_depart_id = la station lue au TODO 2)
-            raise NotImplementedError("E2 : location avec connection.transaction()")
+            with connection.transaction():  # BEGIN
+                with connection.cursor() as cursor:
+                    # On lit la station du vélo AVANT de la mettre à NULL
+                    cursor.execute(
+                        "SELECT station_id, etat FROM velo WHERE id = %s;",
+                        (velo_id,),
+                    )
+                    station_depart_id, etat = cursor.fetchone()
+                    if etat != "disponible":
+                        raise ValueError(
+                            f"vélo {velo_id} non disponible (état : {etat})"
+                        )
+
+                    cursor.execute(
+                        "UPDATE velo SET etat = 'en_trajet', "
+                        "station_id = NULL WHERE id = %s;",
+                        (velo_id,),
+                    )
+                    cursor.execute(
+                        "INSERT INTO trajet (abonne_id, velo_id, "
+                        "station_depart_id, depart_le) "
+                        "VALUES (%s, %s, %s, NOW());",
+                        (abonne_id, velo_id, station_depart_id),
+                    )
             print("  COMMIT automatique (sortie du with sans erreur)")
         except ValueError as error:
             print(f"  ROLLBACK automatique : {error}")

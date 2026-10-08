@@ -1,11 +1,10 @@
 from src.create_connexion import get_connection
 
-# Station où chaque vélo est garé lors de la remise à zéro
-# (le vélo 1 doit repartir de la station 5 pour T1)
-STATION_PAR_DEFAUT = {1: 5, 2: 20, 8: 5}
+# Station où chaque vélo d'exercice est garé lors de la remise à zéro
+STATION_PAR_DEFAUT = {2: 20, 3: 2, 8: 5, 9: 2}
 
 
-def run_reset_velos(velo_id_list=(1, 2, 8)):
+def run_reset_velos(velo_id_list=(2, 3, 8, 9)):
     """Remet les vélos des exercices en état 'disponible'.
 
     Les trajets encore ouverts sont clôturés à leur station de départ,

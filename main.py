@@ -1,46 +1,95 @@
 import sys
 
 from exercice.reset_velos import run_reset_velos
-from exercice.t1_location import run_t1_location
-from exercice.t2_station_inexistante import run_t2_station_inexistante
-from exercice.t3_retour import run_t3_retour
-from exercice.t4_location_python import run_t4_location
-from exercice.t5_concurrence import run_t5_concurrence
+from exercice.e0_sans_transaction import run_e0_location_sans_transaction
+from exercice.e1_transaction_sql import run_e1_location_transaction_sql
+from exercice.e2_location_python import run_e2_location
+from exercice.e3_retour import run_e3_retour
+from exercice.e4_concurrence import run_e4_concurrence
 
+# (étape, titre, fonction à lancer)
 EXERCICE_LIST = [
-    ("T1 - L'abonné 42 loue le vélo 1 (station 5)", run_t1_location),
-    ("T2 - Vélo 2 depuis la station 9999", run_t2_station_inexistante),
-    ("T3 - Retour du vélo 1 à la station 12", run_t3_retour),
-    ("T4 - Location en Python avec connection.transaction()", run_t4_location),
+    (
+        "e0",
+        "E0 - SANS transaction : vélo 2 loué depuis la station 9999 (inexistante)",
+        lambda: run_e0_location_sans_transaction(velo_id=2, station_id=9999),
+    ),
+    (
+        "e1",
+        "E1a - BEGIN/COMMIT à la main : vélo 3 depuis la station 9999 (inexistante)",
+        lambda: run_e1_location_transaction_sql(velo_id=3, station_id=9999),
+    ),
+    (
+        "e1",
+        "E1b - BEGIN/COMMIT à la main : vélo 3 depuis la station 2 (OK)",
+        lambda: run_e1_location_transaction_sql(velo_id=3, station_id=2),
+    ),
+    (
+        "e2",
+        "E2a - with transaction() : l'abonné 42 loue le vélo 8",
+        lambda: run_e2_location(velo_id=8),
+    ),
+    (
+        "e2",
+        "E2b - with transaction() : on retente de louer le vélo 8",
+        lambda: run_e2_location(velo_id=8),
+    ),
+    (
+        "e3",
+        "E3a - Retour du vélo 8 à la station 12",
+        lambda: run_e3_retour(velo_id=8, station_arrivee_id=12),
+    ),
+    (
+        "e3",
+        "E3b - Retour du vélo 9... qui n'a jamais été loué",
+        lambda: run_e3_retour(velo_id=9, station_arrivee_id=12),
+    ),
 ]
 
 
-def run_exercice_list():
-    print("\n=== Remise à zéro des vélos 1, 2 et 8 ===")
-    run_reset_velos()
+def run_exercice(titre, run_function):
+    print(f"\n=== {titre} ===")
+    try:
+        run_function()
+    except NotImplementedError as error:
+        print(f"  ⚠️  À compléter : {error}")
 
-    for titre, run_exercice in EXERCICE_LIST:
+
+def run_exercice_list(etape=None):
+    should_reset = input("Remettre les vélos 2, 3, 8 et 9 à zéro ? (y/n) ")
+    if should_reset == "y":
+        run_reset_velos()
+
+    for exercice_etape, titre, run_function in EXERCICE_LIST:
+        if etape is not None and exercice_etape != etape:
+            continue
         input(f"\nEntrée pour lancer : {titre}")
-        print(f"\n=== {titre} ===")
-        run_exercice()
+        run_exercice(titre, run_function)
 
-    print("\nT1 à T4 terminés. Pour T5, ouvre deux terminaux et lance dans chacun :")
-    print("  uv run python main.py t5")
-    print("(lance d'abord `uv run python main.py reset` pour libérer le vélo 8)")
+    if etape is None:
+        print("\nE0 à E3 terminés. Pour E4, ouvre DEUX terminaux (voir le README).")
 
 
 def main():
     commande = sys.argv[1] if len(sys.argv) > 1 else "all"
 
-    if commande == "t5":
-        print("\n=== T5 - Deux terminaux, un seul vélo 8 ===")
-        run_t5_concurrence()
-    elif commande == "reset":
+    if commande == "reset":
         run_reset_velos()
+    elif commande == "e4":
+        run_exercice(
+            "E4a - Deux terminaux, un seul vélo 9, SANS verrou",
+            lambda: run_e4_concurrence(should_lock=False),
+        )
+    elif commande == "e4-verrou":
+        run_exercice(
+            "E4b - Deux terminaux, un seul vélo 9, AVEC verrou (FOR UPDATE)",
+            lambda: run_e4_concurrence(should_lock=True),
+        )
+    elif commande in ("e0", "e1", "e2", "e3"):
+        run_exercice_list(etape=commande)
     else:
         run_exercice_list()
 
 
 if __name__ == "__main__":
-
     main()

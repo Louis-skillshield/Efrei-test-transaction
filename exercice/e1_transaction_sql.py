@@ -19,13 +19,26 @@ def run_e1_location_transaction_sql(abonne_id=42, velo_id=3, station_id=2):
         with connection.cursor() as cursor:
             print_velo(cursor, velo_id, "avant")
 
-            # TODO 1 : ouvrir la transaction (cursor.execute("BEGIN;"))
-            # TODO 2 : dans un try :
-            #            - l'UPDATE du vélo (comme en E0)
-            #            - l'INSERT du trajet (comme en E0)
-            #            - COMMIT, puis afficher "COMMIT : tout est enregistré"
-            # TODO 3 : dans le except psycopg.Error :
-            #            - ROLLBACK, puis afficher l'erreur et "ROLLBACK"
-            raise NotImplementedError("E1 : BEGIN / COMMIT / ROLLBACK à la main")
+            cursor.execute("BEGIN;")
+            try:
+                cursor.execute(
+                    "UPDATE velo SET etat = 'en_trajet', station_id = NULL "
+                    "WHERE id = %s;",
+                    (velo_id,),
+                )
+                print("  UPDATE du vélo OK (pas encore enregistré)")
+                cursor.execute(
+                    "INSERT INTO trajet (abonne_id, velo_id, "
+                    "station_depart_id, depart_le) "
+                    "VALUES (%s, %s, %s, NOW());",
+                    (abonne_id, velo_id, station_id),
+                )
+                print("  INSERT du trajet OK (pas encore enregistré)")
+                cursor.execute("COMMIT;")
+                print("  COMMIT : tout est enregistré")
+            except psycopg.Error as error:
+                cursor.execute("ROLLBACK;")
+                print(f"  ERREUR : {type(error).__name__}")
+                print("  ROLLBACK : l'UPDATE du vélo est annulé lui aussi")
 
             print_velo(cursor, velo_id, "après")

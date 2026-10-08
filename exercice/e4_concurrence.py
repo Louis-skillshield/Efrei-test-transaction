@@ -7,25 +7,50 @@ def run_e4_concurrence(should_lock, abonne_id=42, velo_id=9):
 
     À lancer dans DEUX terminaux en même temps (voir le README).
 
-    Sans verrou : que se passe-t-il si les deux terminaux lisent
-    'disponible' avant que l'un des deux ait loué ?
+    Sans verrou : les deux terminaux lisent 'disponible', les deux louent
+    -> 2 trajets ouverts pour un seul vélo, même avec une transaction !
 
     Avec verrou (SELECT ... FOR UPDATE) : le premier terminal "réserve" la
-    ligne du vélo jusqu'à la fin de sa transaction.
+    ligne du vélo. Le second reste bloqué sur son SELECT jusqu'au COMMIT du
+    premier, puis lit 'en_trajet' et abandonne.
     """
+    lock_clause = " FOR UPDATE" if should_lock else ""
+
     with get_connection() as connection:
         connection.autocommit = True
         try:
-            # TODO 1 : ouvrir la transaction et un curseur
-            # TODO 2 : SELECT station_id, etat du vélo
-            #          -> ajouter " FOR UPDATE" à la requête si should_lock est vrai
-            #          puis afficher ce qui a été lu
-            # TODO 3 : faire une pause pour laisser l'autre terminal arriver ici :
-            #          input("  >>> Fais pareil dans l'autre terminal, "
-            #                "puis appuie sur Entrée ici...")
-            # TODO 4 : si etat != 'disponible' -> raise ValueError("trop tard ...")
-            # TODO 5 : UPDATE du vélo + INSERT du trajet (comme en E2)
-            raise NotImplementedError("E4 : location concurrente")
+            with connection.transaction():
+                with connection.cursor() as cursor:
+                    print(f"  SELECT{lock_clause} sur le vélo {velo_id}...")
+                    if should_lock:
+                        print("  (si ça bloque ici, l'autre terminal tient le verrou)")
+                    cursor.execute(
+                        "SELECT station_id, etat FROM velo "
+                        f"WHERE id = %s{lock_clause};",
+                        (velo_id,),
+                    )
+                    station_depart_id, etat = cursor.fetchone()
+                    print(f"  Lu : etat={etat}, station={station_depart_id}")
+
+                    input(
+                        "  >>> Fais pareil dans l'autre terminal, "
+                        "puis appuie sur Entrée ici..."
+                    )
+
+                    if etat != "disponible":
+                        raise ValueError(f"trop tard, vélo {velo_id} déjà pris")
+
+                    cursor.execute(
+                        "UPDATE velo SET etat = 'en_trajet', "
+                        "station_id = NULL WHERE id = %s;",
+                        (velo_id,),
+                    )
+                    cursor.execute(
+                        "INSERT INTO trajet (abonne_id, velo_id, "
+                        "station_depart_id, depart_le) "
+                        "VALUES (%s, %s, %s, NOW());",
+                        (abonne_id, velo_id, station_depart_id),
+                    )
             print(f"  COMMIT : vous avez le vélo {velo_id} !")
         except ValueError as error:
             print(f"  ROLLBACK : {error}")
